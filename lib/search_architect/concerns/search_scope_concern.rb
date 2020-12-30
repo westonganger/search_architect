@@ -5,12 +5,24 @@ module SearchArchitect
     class_methods do
       private
 
-      def search_scope(scope_name, attributes:)
+      def search_scope(scope_name, sql_variables: [], attributes:)
+        ### VALIDATES ACTIVE RECORD MODEL
+        unless (self < ActiveRecord::Base)
+          raise StandardError.new("Base class must be an ActiveRecord model")
+        end
+
         ### VALIDATE SCOPE NAME
         if [String, Symbol].include?(scope_name.class)
           scope_name = scope_name.to_s
         else
           raise ArgumentError.new("scope name must be a String or Symbol")
+        end
+
+        ### VALIDATE REQUIRED VARS
+        if !sql_variables.is_a?(Array) || sql_variables.any?{|x| [Symbol, String].exclude?(x.class) }
+          raise ArgumentError.new("Invalid :sql_variables argument. Must be an array of symbols or strings")
+        else
+          required_sql_variables = sql_variables.map{|x| x.to_s}.sort
         end
 
         ### VALIDATE ATTRIBUTES
@@ -30,7 +42,7 @@ module SearchArchitect
           end
         }
 
-        recursive_validate_attrs.call(attributes)
+        recursive_validate_attributes.call(attributes)
 
         ### GENERATE WHERE CONDITIONS AND LEFT JOINS
         where_conditions = []
@@ -80,12 +92,12 @@ module SearchArchitect
         ### SET DEFAULT COMPARISON OPERATOR
         default_comparison_operator = valid_comparison_operators.first # default is ILIKE or LIKE
 
-        ### SET SEARCH QUERY
-        search_query = comparison_operator.include?("LIKE") ? "%#{search_str}%" : search_str
-
         ### CREATE THE SCOPE
-        scope(scope_name) do |search_str, search_type: "multi_search", comparison_operator: default_comparison_operator|
-          if valid_comparison_operators.exclude?(comparison_operator)
+        scope(scope_name, ->(search_str, search_type: "multi_search", comparison_operator: default_comparison_operator, sql_variables: {}){
+          if valid_comparison_operators.include?(comparison_operator)
+            ### SET SEARCH QUERY
+            search_query = comparison_operator.include?("LIKE") ? "%#{search_str}%" : search_str
+          else
             raise ArgumentError.new("Invalid argument for :comparison_operator. Valid options are: #{valid_comparison_operators}")
           end
 
@@ -93,8 +105,29 @@ module SearchArchitect
             raise ArgumentError.new("Invalid :search_type. Valid options are: #{valid_search_types}")
           end
 
-          self.joins(*left_joins).where(where_conditions, comparison_operator: comparison_operator, search: search_query)
-        end
+          if sql_variables.is_a?(Hash)
+            given_variables = sql_variables.keys.map{|x| x.to_s}.sort
+
+            if given_variables != required_sql_variables
+              raise ArgumentError.new("Missing some :sql_variables keys. Requested variables are: #{required_sql_variables}")
+            end
+          else
+            raise ArgumentError.new("Invalid :sql_variables argument. Must be a Hash")
+          end
+
+          rel = self
+
+          if !left_joins.empty?
+            rel = rel.joins(*left_joins)
+          end
+
+          rel.where(
+            where_conditions, 
+            comparison_operator: comparison_operator, 
+            search: search_query,
+            **sql_variables
+          )
+        })
       end
 
     end

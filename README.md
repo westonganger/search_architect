@@ -4,7 +4,7 @@
 <a href='https://travis-ci.com/westonganger/active_record_search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://api.travis-ci.org/westonganger/active_record_search_architect.svg?branch=master' border='0' alt='Build Status' /></a>
 <a href='https://rubygems.org/gems/active_record_search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://ruby-gem-downloads-badge.herokuapp.com/active_record_search_architect?label=rubygems&type=total&total_label=downloads&color=brightgreen' border='0' alt='RubyGems Downloads' /></a>
 
-Dead simple, powerful and fully customizable searching for your Rails or ActiveRecord models and associations.
+Dead simple, powerful and fully customizable searching for your Rails or ActiveRecord models and associations. Capable of searching any attribute type using SQL type casting.
 
 Why This Library:
 
@@ -51,16 +51,33 @@ You can define any search scopes on your model using the following:
 ```ruby
 class Post < ApplicationRecord
   include SearchArchitect::SearchConcern
+  
+  belongs_to :author, class_name: 'User'
 
   search_scope :search, attributes: [
     :name,
-    :code,
-    author: [:first_name, :last_name],
 
+    "#{self.table.name}.code", ### Plain SQL fully supported
+
+    "CAST(#{self.table_name}.number AS VARCHAR)", # Must convert any non-string fields for searching
+
+    # For any associations, when using a SQL string the table will always be the "association name", not the literal table name, under the hood this is done using SQL aliases.
+    author: [:first_name, "author.last_name", "CAST(author.number AS VARCHAR)"],
   ]
-
-  search_scope :list_search, attributes: [
-    # etc.
+  
+  search_scope :search_with_locale, required_vars: [:locale], attributes: [
+    "#{self.table_name}.name_translations ->> :locale", # specify any variables as symbols, Ex. :locale
+  ]
+  
+  search_scope :search_date_example, attributes: [
+    # PostgreSQL, Oracle
+    "TO_CHAR(#{self.table_name}.approved_at, 'YYYY-mm-dd')",
+    
+    # MySQL
+    "DATE_FORMAT(#{self.table_name}.approved_at, '%Y-%m-%d')",
+    
+    # SQLite
+    "strftime(#{self.table_name}.approved, '%Y-%m-%d')",
   ]
 
 end
@@ -73,7 +90,7 @@ You would now have access to the following searching methods:
 ### Split words on whitespace characters, Quoting is allowed to combine words
 posts = Post.search(params[:search])
 
-posts = Post.list_search(params[:search])
+posts = Post.search_with_locale(params[:search], sql_variables: {locale: @current_locale})
 ```
 
 ## Search Types
@@ -81,7 +98,7 @@ posts = Post.list_search(params[:search])
 ### Multi Word Full-text Search - RECOMMENDED
 ```ruby
 posts = Post.search(params[:search], search_type: :multi_search)
-# OR
+### OR
 posts = Post.search(params[:search]) # defaults to :multi_search
 ```
 
@@ -101,13 +118,17 @@ posts = Post.search(params[:search], comparison_operator: 'ILIKE')
 
 The default is `ILIKE` if Postgresql or `LIKE` if non-postgres.
 
+# SQL Type Casting Cheatsheet
+
+- [docs/sql_type_casting_cheatsheet.md](./docs/sql_type_casting_cheatsheet.md)
+
 # Key Models Provided & Additional Customizations
 
 A key aspect of this library is its simplicity and small API. For major functionality customizations we encourage you to first delete this gem and then copy this gems code directly into your repository.
 
 I strongly encourage you to read the code for this library to understand how it works within your project so that you are capable of customizing the functionality later.
 
-- [SearchConcern](https://github.com/westonganger/active_record_search_architect/blob/master/lib/search_architect/concerns/search_concern.rb)
+- [SearchConcern](./lib/search_architect/concerns/search_scope_concern.rb)
 
 # Search Form / View Example
 

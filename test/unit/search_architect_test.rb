@@ -5,7 +5,7 @@ class SearchArchitectTest < Minitest::Test
   def test_exposes_main_module
     assert SearchArchitect.is_a?(Module)
 
-    assert_not defined?(ActiveRecordSearchArchitect)
+    assert !defined?(ActiveRecordSearchArchitect)
   end
 
   def test_exposes_version
@@ -13,25 +13,25 @@ class SearchArchitectTest < Minitest::Test
   end
 
   def test_provides_search_scope_method
-    assert_not SearchArchitect.respond_to?(:search_scope)
+    assert !SearchArchitect.respond_to?(:search_scope)
 
-    SearchArchitect.send(:search_scope, :foobar_search, attributes: [])
+    assert SearchArchitect.private_methods.include?(:search_scope)
 
-    assert_raise ArgumentError do
+    assert_raises StandardError do
       SearchArchitect.send(:search_scope, [])
     end
   end
 
   def test_attributes
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Post.send(:search_scope, :search, attributes: false)
     end
 
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Post.send(:search_scope, :search, attributes: [[]])
     end
 
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Post.send(:search_scope, :search, attributes: [Object.new])
     end
 
@@ -62,7 +62,7 @@ class SearchArchitectTest < Minitest::Test
     ])
 
     ### TODO incorrect association name
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Post.send(:search_scope, :search, attributes: [
         :name, 
         {
@@ -76,12 +76,14 @@ class SearchArchitectTest < Minitest::Test
     scope_name = "test_comparison_operators_1"
     Post.send(:search_scope, scope_name, attributes: [])
 
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Post.send(scope_name, "foo bar", comparison_operator: "asd")
     end
 
-    Post.send(scope_name, "foo bar", comparison_operator: "ILIKE")
-    # TODO
+    case ActiveRecord::Base.connection.adapter_name.downcase.to_s
+    when "postgresql"
+      Post.send(scope_name, "foo bar", comparison_operator: "ILIKE")
+    end
 
     Post.send(scope_name, "foo bar", comparison_operator: "LIKE")
     # TODO
@@ -94,11 +96,11 @@ class SearchArchitectTest < Minitest::Test
     scope_name = "test_search_types_1"
     Post.send(:search_scope, scope_name, attributes: [])
 
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Post.send(scope_name, "foo bar", search_type: "asd")
     end
 
-    assert_raise ArgumentError do
+    assert_raises ArgumentError do
       Post.send(scope_name, "foo bar", search_type: {})
     end
 
