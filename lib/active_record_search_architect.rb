@@ -1,0 +1,1 @@
+require "search_architect"
