@@ -13,7 +13,7 @@ Searching requires customizability. This gem's small API and fully understandabl
 If you are considering using [ransack](https://github.com/activerecord-hackery/ransack) then you should think again because `ransack` is a very dirty solution that completely integrates the Searching, Sorting, and Views as requirements of eachother. By not having these features seperated hurts your ability to customize and modify your code. Don't fall into this trap. Use something you fully understand instead.
 
 
-## Installation
+# Installation
 
 ```ruby
 gem 'active_record_search_architect'
@@ -44,7 +44,7 @@ ActiveSupport.on_load(:active_record) do
 end
 ```
 
-## Search Scopes
+# Defining Search Scopes
 
 You can define any search scopes on your model using the following:
 
@@ -87,36 +87,41 @@ You would now have access to the following searching methods:
 
 ```ruby
 ### Multi Word Full-text Search, RECOMMENDED
-### Split words on whitespace characters, Quoting is allowed to combine words
 posts = Post.search(params[:search])
 
 posts = Post.search_with_locale(params[:search], sql_variables: {locale: @current_locale})
 ```
 
-## Search Types
+# Search Types
 
-### Multi Word Full-text Search - RECOMMENDED
+We includes two different searching types:
+
+### Multi Word Full-text Search
+
+Recommended. Split words on whitespace characters, Quoting is allowed to combine words
+
 ```ruby
 posts = Post.search(params[:search], search_type: :multi_search)
 ### OR
 posts = Post.search(params[:search]) # defaults to :multi_search
 ```
 
-### Full String Search - Considers entire string as one search. 
-### In my experience this is the natural choice however the multi-search proves to be more powerful and flexible.
+### Full String Search
+
+Considers entire string as one search. In my experience this is the natural choice however the multi-search proves to be very powerful.
 ```ruby
 posts = Post.search(params[:search], search_type: :full_search)
 ```
 
-## Comparison Operators
+# Comparison Operators
 
 Different comparison operators can be specified by adding the `:comparison_operator` argument
 
 ```ruby
-posts = Post.search(params[:search], comparison_operator: 'ILIKE')
+posts = Post.search(params[:search], comparison_operator: '=')
 ```
 
-The default is `ILIKE` if Postgresql or `LIKE` if non-postgres.
+The default is `ILIKE` if Postgresql or `LIKE` if non-postgres. Current valid options are: `ILIKE`, `LIKE`, and `=`
 
 # SQL Type Casting Cheatsheet
 
@@ -135,14 +140,9 @@ I strongly encourage you to read the code for this library to understand how it 
 We do not provide built in view templates because this is a major restriction to applications. Instead we provide an optional simple copy-and-pasteable starter template.
 
 ```slim
-// ### app/views/shared/_search_form.html.slim
-
 - search_param_name = "search"
-
 - search_text = params[search_param_name]
-
 - search_path = local_assigns[:search_path] || request.path
-
 - back_path = local_assigns[:back_path] || request.path
 
 .table-utilities

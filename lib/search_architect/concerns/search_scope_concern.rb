@@ -70,7 +70,7 @@ module SearchArchitect
                 recursive_add_to_sql_columns.call(assoc_name, inner_attrs) 
               end
             else
-              where_conditions << "#{table_alias}.#{attr_entry} :comparison_operator :search"
+              where_conditions << "(#{table_alias}.#{attr_entry} :comparison_operator :search)"
             end
           end
         }
@@ -80,7 +80,7 @@ module SearchArchitect
         where_conditions = where_conditions.join(" OR ")
 
         ### SET VALID OPTION TYPES
-        valid_search_types = ["multi_search", "full_search"]
+        valid_search_types = []
 
         valid_comparison_operators = ['LIKE', '=']
 
@@ -94,15 +94,51 @@ module SearchArchitect
 
         ### CREATE THE SCOPE
         scope(scope_name, ->(search_str, search_type: "multi_search", comparison_operator: default_comparison_operator, sql_variables: {}){
-          if valid_comparison_operators.include?(comparison_operator)
-            ### SET SEARCH QUERY
-            search_query = comparison_operator.include?("LIKE") ? "%#{search_str}%" : search_str
-          else
+          if valid_comparison_operators.exclude?(comparison_operator)
             raise ArgumentError.new("Invalid argument for :comparison_operator. Valid options are: #{valid_comparison_operators}")
           end
 
-          if valid_search_types.exclude?(search_type.to_s)
-            raise ArgumentError.new("Invalid :search_type. Valid options are: #{valid_search_types}")
+          case search_type
+          when "full_search"
+            search_terms = [search_str]
+          when "multi_search"
+            ### Split on spaces but handle string quoting (one level deep only)
+            search_terms = []
+
+            wait_for_quote_type = nil
+
+            start_index = 0
+
+            search_str.chars.each_with_index do |char, i|
+              if char == '"'
+                # Double Quotes
+                if wait_for_quote_type == '"'
+                  search_terms << search_str[start_index..i-1]
+                  start_index = i+1
+                  wait_for_quote_type = nil
+                else
+                  wait_for_quote_type = '"'
+                end
+
+              elsif char == "'"
+                # Single Quotes
+                if wait_for_quote_type == "'"
+                  search_terms << search_str[start_index..i-1]
+                  start_index = i+1
+                  wait_for_quote_type = nil
+                else
+                  wait_for_quote_type = "'"
+                end
+
+              elsif char =~ /\s/
+                # Whitespace
+                search_terms << search_str[start_index..i-1]
+                start_index = i+1
+              end
+            end
+
+          else
+            raise ArgumentError.new("Invalid :search_type. Valid options are: [:multi_search, :full_search]")
           end
 
           if sql_variables.is_a?(Hash)
@@ -121,12 +157,21 @@ module SearchArchitect
             rel = rel.joins(*left_joins)
           end
 
-          rel.where(
-            where_conditions, 
-            comparison_operator: comparison_operator, 
-            search: search_query,
-            **sql_variables
-          )
+          search_terms.each do |q|
+            if valid_comparison_operators.include?(comparison_operator)
+              ### SET SEARCH QUERY
+              search_query = comparison_operator.include?("LIKE") ? "%#{q}%" : q
+            end
+
+            rel = rel.where(
+              where_conditions, 
+              comparison_operator: comparison_operator, 
+              search: search_query,
+              **sql_variables
+            )
+          end
+
+          next rel
         })
       end
 
