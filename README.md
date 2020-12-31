@@ -21,36 +21,13 @@ gem 'active_record_search_architect'
 
 Then add `include SearchArchitect` to your ApplicationRecord or models.
 
-If you want to apply to all models You can create an initializer if the ApplicationRecord model doesnt exist.
-
-```ruby
-### Preferred
-class ApplicationRecord < ActiveRecord::Base
-  include SearchArchitect
-end
-
-### OR for individual models
-
-class Post < ActiveRecord::Base
-  include SearchArchitect
-end
-
-### OR for all models without an ApplicationRecord model
-
-# config/initializers/active_record_search_architect.rb
-ActiveSupport.on_load(:active_record) do
-  ### Load for all ActiveRecord models
-  include SearchArchitect
-end
-```
-
 # Defining Search Scopes
 
 You can define any search scopes on your model using the following:
 
 ```ruby
 class Post < ApplicationRecord
-  include SearchArchitect::SearchConcern
+  include SearchArchitect
   
   belongs_to :author, class_name: 'User'
 
