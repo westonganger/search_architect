@@ -27,16 +27,22 @@ module SearchArchitect
 
         ### VALIDATE ATTRIBUTES
         recursive_validate_attributes = ->(attrs){
+          if attrs.is_a?(Hash)
+            attrs = attrs.values
+          end
+
           if !attrs.is_a?(Array)
-            raise ArgumentError.new("Invalid :attributes argument")
+            raise ArgumentError.new("Invalid :attributes argument, #{attr_entry.to_s}")
           else
             attrs.each do |attr_entry|
               if attr_entry.is_a?(Hash)
-                recursive_validate_attributes.call(attr_entry)
-              elsif [String, Symbol, Hash, HashWithIndifferentAccess].include?(attr_entry.class)
+                attr_entry.values.each do |v|
+                  recursive_validate_attributes.call(v)
+                end
+              elsif [String, Symbol].include?(attr_entry.class)
                 next
               else
-                raise ArgumentError.new("Invalid :attributes argument")
+                raise ArgumentError.new("Invalid :attributes argument, #{attr_entry.to_s}")
               end
             end
           end
@@ -46,28 +52,43 @@ module SearchArchitect
 
         ### GENERATE WHERE CONDITIONS AND LEFT JOINS
         where_conditions = []
-        left_joins = []
+        sql_joins = []
         
-        recursive_add_to_sql_columns = ->(table_alias, attrs){
+        recursive_add_to_sql_columns = ->(table_alias, attrs, current_klass){
           table_alias = table_alias.to_s
 
           attrs.each do |attr_entry|
             if attrs.is_a?(Hash)
               attrs.each do |assoc_name, inner_attrs|
-                assoc_reflection = self.reflect_on_all_associations.detect{|x| x.name.to_s == table_alias}
+                assoc_reflection = current_klass.reflect_on_all_associations.detect{|x| x.name.to_s == table_alias}
 
-                case assoc_reflection.type.to_s
-                when "belongs_to"
-                  join_on = "ON #{current_table_name}.#{}"
-                when "has_and_belongs_to_many"
-                  join_on = ""
-                else
-                  join_on = "ON #{current_table_name}. = #{assoc_name}.#{}"
+                if assoc_reflection.nil?
+                  raise ArgumentError.new("Association '#{table_alias.to_sym}' not found on class '#{current_klass.name}'")
                 end
 
-                sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_name} #{join_on}"
+                if assoc_reflection.belongs_to?
+                  if assoc_reflection.through_reflection
+                    # TODO
+                  else
+                    join_on = "ON #{current_table_name}.#{assoc_reflection.foreign_key} = #{assoc_reflection.klass.table_name}.id"
 
-                recursive_add_to_sql_columns.call(assoc_name, inner_attrs) 
+                    sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_name} #{join_on}"
+                  end
+
+                elsif ['HasOne','HasMany'].include?(assoc_reflection.association_class.name)
+                  if assoc_reflection.through_reflection
+                    # TODO
+                  else
+                    join_on = "ON #{current_table_name}.id = #{assoc_reflection.klass.table_name}.#{assoc_reflection.foreign_key}"
+
+                    sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_name} #{join_on}"
+                  end
+
+                else
+                  raise ArgumentError.new("Unsupported Association Type: #{assoc_reflection.type}")
+                end
+
+                recursive_add_to_sql_columns.call(assoc_name, inner_attrs, current_klass) 
               end
             else
               where_conditions << "(#{table_alias}.#{attr_entry} :comparison_operator :search)"
@@ -75,13 +96,11 @@ module SearchArchitect
           end
         }
 
-        recursive_add_to_sql_columns.call(self.table_name, attributes)
+        recursive_add_to_sql_columns.call(self.table_name, attributes, self)
 
         where_conditions = where_conditions.join(" OR ")
 
         ### SET VALID OPTION TYPES
-        valid_search_types = []
-
         valid_comparison_operators = ['LIKE', '=']
 
         case connection.adapter_name.downcase.to_s
@@ -153,8 +172,8 @@ module SearchArchitect
 
           rel = self
 
-          if !left_joins.empty?
-            rel = rel.joins(*left_joins)
+          if !sql_joins.empty?
+            rel = rel.uniq.joins(*sql_joins)
           end
 
           search_terms.each do |q|

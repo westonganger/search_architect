@@ -23,3 +23,22 @@ Minitest::Reporters.use!(
 )
 
 require "minitest/autorun"
+
+# Run any available migration
+if ActiveRecord.gem_version >= Gem::Version.new("6.0")
+  ActiveRecord::MigrationContext.new(File.expand_path("dummy_app/db/migrate/", __dir__), ActiveRecord::SchemaMigration).migrate
+elsif ActiveRecord.gem_version >= Gem::Version.new("5.2")
+  ActiveRecord::MigrationContext.new(File.expand_path("dummy_app/db/migrate/", __dir__)).migrate
+else
+  ActiveRecord::Migrator.migrate File.expand_path("dummy_app/db/migrate/", __dir__)
+end
+
+DATA = {}.with_indifferent_access
+
+DATA[:posts] = [
+  Post.find_or_create_by!(number: 1, name: '', code: ''),
+  Post.find_or_create_by!(number: 2, name: '', code: ''),
+  Post.find_or_create_by!(number: 3, name: '', code: ''),
+  Post.find_or_create_by!(number: 4, name: '', code: ''),
+  Post.find_or_create_by!(number: 5, name: '', code: ''),
+].shuffle

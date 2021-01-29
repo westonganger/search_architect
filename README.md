@@ -110,7 +110,7 @@ A key aspect of this library is its simplicity and small API. For major function
 
 I strongly encourage you to read the code for this library to understand how it works within your project so that you are capable of customizing the functionality later.
 
-- [SearchConcern](./lib/search_architect/concerns/search_scope_concern.rb)
+- [lib/search_architect/concerns/search_scope_concern.rb](./lib/search_architect/concerns/search_scope_concern.rb)
 
 # Search Form / View Example
 

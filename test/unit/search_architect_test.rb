@@ -42,7 +42,8 @@ class SearchArchitectTest < Minitest::Test
 
     Post.send(:search_scope, :search, attributes: [
       :name, 
-      :content, {
+      :content, 
+      {
         comments: [:content]
       }
     ])
