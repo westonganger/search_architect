@@ -1,11 +1,17 @@
 require "test_helper"
 
-class SearchArchitectTest < Minitest::Test
+class SearchArchitectTest < ActiveSupport::TestCase
+
+  setup do
+  end
+
+  teardown do
+  end 
 
   def test_exposes_main_module
     assert SearchArchitect.is_a?(Module)
 
-    assert !defined?(ActiveRecordSearchArchitect)
+    assert !defined?(SearchArchitect)
   end
 
   def test_exposes_version

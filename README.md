@@ -1,8 +1,8 @@
 # Active Record Search Architect
 
-<a href="https://badge.fury.io/rb/active_record_search_architect" target="_blank"><img height="21" style='border:0px;height:21px;' border='0' src="https://badge.fury.io/rb/active_record_search_architect.svg" alt="Gem Version"></a>
-<a href='https://travis-ci.com/westonganger/active_record_search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://api.travis-ci.org/westonganger/active_record_search_architect.svg?branch=master' border='0' alt='Build Status' /></a>
-<a href='https://rubygems.org/gems/active_record_search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://ruby-gem-downloads-badge.herokuapp.com/active_record_search_architect?label=rubygems&type=total&total_label=downloads&color=brightgreen' border='0' alt='RubyGems Downloads' /></a>
+<a href="https://badge.fury.io/rb/search_architect" target="_blank"><img height="21" style='border:0px;height:21px;' border='0' src="https://badge.fury.io/rb/search_architect.svg" alt="Gem Version"></a>
+<a href='https://travis-ci.com/westonganger/search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://api.travis-ci.org/westonganger/search_architect.svg?branch=master' border='0' alt='Build Status' /></a>
+<a href='https://rubygems.org/gems/search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://ruby-gem-downloads-badge.herokuapp.com/search_architect?label=rubygems&type=total&total_label=downloads&color=brightgreen' border='0' alt='RubyGems Downloads' /></a>
 
 Dead simple, powerful and fully customizable searching for your Rails or ActiveRecord models and associations. Capable of searching any attribute type using SQL type casting.
 
@@ -16,7 +16,7 @@ If you are considering using [ransack](https://github.com/activerecord-hackery/r
 # Installation
 
 ```ruby
-gem 'active_record_search_architect'
+gem 'search_architect'
 ```
 
 Then add `include SearchArchitect` to your ApplicationRecord or models.

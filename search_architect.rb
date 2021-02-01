@@ -1,14 +1,14 @@
 require_relative 'lib/search_architect/version'
 
 Gem::Specification.new do |s|
-  s.name          = "active_record_search_architect"
+  s.name          = "search_architect"
   s.version       = SearchArchitect::VERSION
   s.authors       = ["Weston Ganger"]
   s.email         = ["weston@westonganger.com"]
 
   s.summary       = "Dead simple, fully customizable searching for your ActiveRecord models and associations."
   s.description   = s.summary
-  s.homepage      = "https://github.com/westonganger/active_record_search_architect"
+  s.homepage      = "https://github.com/westonganger/search_architect"
   s.license       = "MIT"
 
   s.metadata["source_code_uri"] = s.homepage
@@ -22,4 +22,13 @@ Gem::Specification.new do |s|
 
   s.add_runtime_dependency "activerecord"
   s.add_runtime_dependency "railties"
+
+  s.add_development_dependency "rake"
+  s.add_development_dependency "minitest"
+  s.add_development_dependency "minitest-reporters"
+
+  if RUBY_VERSION.to_f >= 2.4
+    s.add_development_dependency "warning"
+  end
+
 end

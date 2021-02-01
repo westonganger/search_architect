@@ -12,4 +12,8 @@
 
 ActiveRecord::Schema.define(version: 2020_10_01_061824) do
 
+  create_table "posts", force: :cascade do |t|
+    t.integer :a, :b
+  end
+
 end
