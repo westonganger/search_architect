@@ -26,21 +26,11 @@ class SearchArchitectTest < ActiveSupport::TestCase
     assert_raises StandardError do
       SearchArchitect.send(:search_scope, [])
     end
+
+    assert Post.respond_to?(:search_scope)
   end
 
   def test_attributes
-    assert_raises ArgumentError do
-      Post.send(:search_scope, :search, attributes: false)
-    end
-
-    assert_raises ArgumentError do
-      Post.send(:search_scope, :search, attributes: [[]])
-    end
-
-    assert_raises ArgumentError do
-      Post.send(:search_scope, :search, attributes: [Object.new])
-    end
-
     Post.send(:search_scope, :search, attributes: [
       :name, 
       :content
@@ -67,30 +57,11 @@ class SearchArchitectTest < ActiveSupport::TestCase
         ]
       }
     ])
-
-    ### TODO incorrect association name
-    assert_raises ArgumentError do
-      Post.send(:search_scope, :search, attributes: [
-        :name, 
-        {
-          foobar: []
-        }
-      ])
-    end
   end
 
   def test_comparison_operators
     scope_name = "test_comparison_operators_1"
     Post.send(:search_scope, scope_name, attributes: [])
-
-    assert_raises ArgumentError do
-      Post.send(scope_name, "foo bar", comparison_operator: "asd")
-    end
-
-    case ActiveRecord::Base.connection.adapter_name.downcase.to_s
-    when "postgresql"
-      Post.send(scope_name, "foo bar", comparison_operator: "ILIKE")
-    end
 
     Post.send(scope_name, "foo bar", comparison_operator: "LIKE")
     # TODO
@@ -99,23 +70,18 @@ class SearchArchitectTest < ActiveSupport::TestCase
     # TODO
   end
 
-  def test_search_types
-    scope_name = "test_search_types_1"
-    Post.send(:search_scope, scope_name, attributes: [])
+  def test_full_search
+    Post.send(scope_name, "foo bar", search_type: "full_search")
+  end
 
-    assert_raises ArgumentError do
-      Post.send(scope_name, "foo bar", search_type: "asd")
-    end
-
-    assert_raises ArgumentError do
-      Post.send(scope_name, "foo bar", search_type: {})
-    end
-
-    #Post.send(scope_name, "foo bar") ### TODO test returns multi search
+  def test_multi_search
+    Post.send(scope_name, "foo bar") ### TODO test returns multi search
 
     Post.send(scope_name, "foo bar", search_type: "multi_search")
+  end
 
-    Post.send(scope_name, "foo bar", search_type: "full_search")
+  def test_quoted_multi_searching
+    # TODO
   end
 
   def test_search_lifecycle

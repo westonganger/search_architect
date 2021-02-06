@@ -15,10 +15,10 @@ module SearchArchitect
         if [String, Symbol].include?(scope_name.class)
           scope_name = scope_name.to_s
         else
-          raise ArgumentError.new("scope name must be a String or Symbol")
+          raise ArgumentError.new("Scope name must be a String or Symbol")
         end
 
-        ### VALIDATE REQUIRED VARS
+        ### VALIDATE SQL VARIABLES
         if !sql_variables.is_a?(Array) || sql_variables.any?{|x| [Symbol, String].exclude?(x.class) }
           raise ArgumentError.new("Invalid :sql_variables argument. Must be an array of symbols or strings")
         else
@@ -53,42 +53,48 @@ module SearchArchitect
         ### GENERATE WHERE CONDITIONS AND LEFT JOINS
         where_conditions = []
         sql_joins = []
+
+        recursive_add_association_to_joins = ->(current_reflection_or_klass:, assoc_reflection:){
+          if assoc_reflection.belongs_to?
+            join_on = "ON #{current_reflection_or_klass.name}.#{assoc_reflection.foreign_key} = #{assoc_reflection.name}.#{assoc_reflection.primary_key}"
+          else
+            join_on = "ON #{current_reflection_or_klass.name}.#{assoc_reflection.primary_key} = #{assoc_reflection.name}.#{assoc_reflection.foreign_key}"
+          end
+
+          sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_reflection.name} #{join_on}"
+
+          if assoc_reflection.through_reflection
+            recursive_add_association_to_joins.call(
+              current_reflection_or_klass: assoc_reflection, 
+              assoc_reflection: assoc_reflection.through_reflection,
+            )
+          end
+        }
         
-        recursive_add_to_sql_columns = ->(table_alias, attrs, current_klass){
-          table_alias = table_alias.to_s
+        recursive_add_to_sql_columns = ->(current_reflection_or_klass, attrs){
+          if current_reflection_or_klass.class.name.start_with?("ActiveRecord::Reflection::")
+            current_klass = current_reflection_or_klass.klass
+            table_alias = current_reflection_or_klass.name
+          else
+            current_klass = current_klass
+            table_alias = current_klass.table_name
+          end
 
           attrs.each do |attr_entry|
             if attrs.is_a?(Hash)
               attrs.each do |assoc_name, inner_attrs|
-                assoc_reflection = current_klass.reflect_on_all_associations.detect{|x| x.name.to_s == table_alias}
+                assoc_reflection = current_klass.reflect_on_all_associations.detect{|x| x.name.to_s == assoc_name}
 
                 if assoc_reflection.nil?
-                  raise ArgumentError.new("Association '#{table_alias.to_sym}' not found on class '#{current_klass.name}'")
+                  raise ArgumentError.new("Association '#{assoc_name}' not found on class '#{current_klass.name}'")
                 end
 
-                if assoc_reflection.belongs_to?
-                  if assoc_reflection.through_reflection
-                    # TODO
-                  else
-                    join_on = "ON #{current_table_name}.#{assoc_reflection.foreign_key} = #{assoc_reflection.klass.table_name}.id"
+                recursive_add_association_to_joins.call(
+                  current_reflection_or_klass: current_reflection_or_klass, 
+                  assoc_reflection: assoc_reflection,
+                )
 
-                    sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_name} #{join_on}"
-                  end
-
-                elsif ['HasOne','HasMany'].include?(assoc_reflection.association_class.name)
-                  if assoc_reflection.through_reflection
-                    # TODO
-                  else
-                    join_on = "ON #{current_table_name}.id = #{assoc_reflection.klass.table_name}.#{assoc_reflection.foreign_key}"
-
-                    sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_name} #{join_on}"
-                  end
-
-                else
-                  raise ArgumentError.new("Unsupported Association Type: #{assoc_reflection.type}")
-                end
-
-                recursive_add_to_sql_columns.call(assoc_name, inner_attrs, current_klass) 
+                recursive_add_to_sql_columns.call(assoc_reflection, inner_attrs) 
               end
             else
               where_conditions << "(#{table_alias}.#{attr_entry} :comparison_operator :search)"
@@ -96,11 +102,11 @@ module SearchArchitect
           end
         }
 
-        recursive_add_to_sql_columns.call(self.table_name, attributes, self)
+        recursive_add_to_sql_columns.call(self, attributes)
 
         where_conditions = where_conditions.join(" OR ")
 
-        ### SET VALID OPTION TYPES
+        ### SET VALID COMPARISON OPERATORS
         valid_comparison_operators = ['LIKE', '=']
 
         case connection.adapter_name.downcase.to_s
@@ -121,38 +127,40 @@ module SearchArchitect
           when "full_search"
             search_terms = [search_str]
           when "multi_search"
-            ### Split on spaces but handle string quoting (one level deep only)
-            search_terms = []
+            ### SPLIT ON ALL WHITESPACE CHARACTERS
+            orig_search_array = search_str.split(/\s/)
 
-            wait_for_quote_type = nil
+            search_array = []
 
-            start_index = 0
+            char = '"'
+            start_quote_item_index = nil
 
-            search_str.chars.each_with_index do |char, i|
-              if char == '"'
-                # Double Quotes
-                if wait_for_quote_type == '"'
-                  search_terms << search_str[start_index..i-1]
-                  start_index = i+1
-                  wait_for_quote_type = nil
+            ### HANDLE DOUBLE QUOTED SEARCH ITEMS WITH SPACES
+            orig_search_array.each_with_index do |word, i|
+              if start_quote_item_index.nil? && word.start_with?(quote_char)
+                if word.end_with?(quote_char)
+                  search_array << word[1..-2]
                 else
-                  wait_for_quote_type = '"'
+                  start_quote_item_index = i
                 end
 
-              elsif char == "'"
-                # Single Quotes
-                if wait_for_quote_type == "'"
-                  search_terms << search_str[start_index..i-1]
-                  start_index = i+1
-                  wait_for_quote_type = nil
+              elsif start_quote_item_index
+                if word.end_with?(quote_char)
+                  search_array << orig_search_array[start_quote_item_index..i][1..-2]
+
+                elsif (orig_search_array_size == i+1)
+                  num = ((orig_search_array_size-1) - start_quote_item_index)
+
+                  num.times do |i|
+                    search_array << orig_search_array[i+start_quote_item_index]
+                  end
+
                 else
-                  wait_for_quote_type = "'"
+                  next
                 end
 
-              elsif char =~ /\s/
-                # Whitespace
-                search_terms << search_str[start_index..i-1]
-                start_index = i+1
+              else
+                search_array << word
               end
             end
 
@@ -173,14 +181,12 @@ module SearchArchitect
           rel = self
 
           if !sql_joins.empty?
-            rel = rel.uniq.joins(*sql_joins)
+            rel = rel.uniq.joins(*sql_joins.uniq)
           end
 
           search_terms.each do |q|
-            if valid_comparison_operators.include?(comparison_operator)
-              ### SET SEARCH QUERY
-              search_query = comparison_operator.include?("LIKE") ? "%#{q}%" : q
-            end
+            ### SET SEARCH QUERY
+            search_query = comparison_operator.include?("LIKE") ? "%#{q}%" : q
 
             rel = rel.where(
               where_conditions, 

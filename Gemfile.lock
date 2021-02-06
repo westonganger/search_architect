@@ -148,11 +148,11 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  search_architect!
   minitest
   minitest-reporters
-  rails (= 6.1.0)
+  rails
   rake
+  search_architect!
   sqlite3
   warning
 

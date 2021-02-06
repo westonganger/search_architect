@@ -1,0 +1,22 @@
+- search_param_name = "search"
+- search_text = params[search_param_name]
+- search_path = local_assigns[:search_path] || url_for(params.to_unsafe_h.merge(search: nil))
+- back_path = local_assigns[:back_path] || search_path
+
+.table-utilities
+  .container-fluid
+    .row
+      .col-lg-7.col-md-7.col-sm-7.search-field-padding-offset
+        form#formSearch.search-form action=search_path method="get" 
+          .form-group.has-feedback
+            span.input-group
+              - if search_text.present?
+                span.input-group-btn
+                  a.btn.btn-danger href=back_path  Clear
+
+              input.form-control.input-lg.search-bar autofocus="" name=search_param_name placeholder="Search" type="text" value=search_text
+
+              span.input-group-btn
+                button.btn.btn-primary type="submit"
+                  i.fal.fa-search
+                  | Search

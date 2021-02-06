@@ -1,16 +1,14 @@
-# Active Record Search Architect
+# Search Architect
 
 <a href="https://badge.fury.io/rb/search_architect" target="_blank"><img height="21" style='border:0px;height:21px;' border='0' src="https://badge.fury.io/rb/search_architect.svg" alt="Gem Version"></a>
-<a href='https://travis-ci.com/westonganger/search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://api.travis-ci.org/westonganger/search_architect.svg?branch=master' border='0' alt='Build Status' /></a>
+<a href='https://github.com/westonganger/search_architect/actions' target='_blank'><img src="https://github.com/westonganger/search_architect/workflows/Tests/badge.svg" style="max-width:100%;" height='21' style='border:0px;height:21px;' border='0' alt="CI Status"></a>
 <a href='https://rubygems.org/gems/search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://ruby-gem-downloads-badge.herokuapp.com/search_architect?label=rubygems&type=total&total_label=downloads&color=brightgreen' border='0' alt='RubyGems Downloads' /></a>
 
 Dead simple, powerful and fully customizable searching for your Rails or ActiveRecord models and associations. Capable of searching any attribute type using SQL type casting.
 
 Why This Library:
 
-Searching requires customizability. This gem's small API and fully understandable design allow you to fully understand how it works. Install this gem and read its code completely OR copy the code straight into your codebase. Know it completely. Now you are free.
-
-If you are considering using [ransack](https://github.com/activerecord-hackery/ransack) then you should think again because `ransack` is a very dirty solution that completely integrates the Searching, Sorting, and Views as requirements of eachother. By not having these features seperated hurts your ability to customize and modify your code. Don't fall into this trap. Use something you fully understand instead.
+If you are considering using the `ransack` gem, then you should think again because `ransack` is a very dirty solution that completely integrates the Searching, Sorting, and Views as requirements of eachother. Not having these features separated hurts your ability to customize and modify your code. Don't fall into this trap. This gem is just one concern with one scope. If you want to customize it later you can simply copy the code directly into your project.
 
 
 # Installation
@@ -29,17 +27,24 @@ You can define any search scopes on your model using the following:
 class Post < ApplicationRecord
   include SearchArchitect
   
-  belongs_to :author, class_name: 'User'
+  has_many :comments
 
   search_scope :search, attributes: [
     :name,
 
+    comments: [
+      :content,
+
+      author: [
+        :first_name, 
+        "author.last_name", # Associations SQL table alias equals the association name, not actual table name
+        "CAST(author.number AS VARCHAR)"
+        ],
+    ],
+
     "#{self.table.name}.code", ### Plain SQL fully supported
 
     "CAST(#{self.table_name}.number AS VARCHAR)", # Must convert any non-string fields for searching
-
-    # For any associations, when using a SQL string the table will always be the "association name", not the literal table name, under the hood this is done using SQL aliases.
-    author: [:first_name, "author.last_name", "CAST(author.number AS VARCHAR)"],
   ]
   
   search_scope :search_with_locale, required_vars: [:locale], attributes: [
@@ -102,7 +107,32 @@ The default is `ILIKE` if Postgresql or `LIKE` if non-postgres. Current valid op
 
 # SQL Type Casting Cheatsheet
 
-- [docs/sql_type_casting_cheatsheet.md](./docs/sql_type_casting_cheatsheet.md)
+- Numbers:
+  - `CAST(posts.number AS VARCHAR)`
+- Date / Time:
+  - Postgresql, Oracle
+    - `TO_CHAR(posts.created_at, 'YYYY-mm-dd')`
+  - MySQL
+    - `DATE_FORMAT(posts.created_at, '%Y-%m-%d')`
+  - SQLite
+    `strftime(posts.created_at, '%Y-%m-%d')`
+
+#### Limitation: CASE Statements in WHERE Clauses
+
+Apparently SQL has the restriction where you cannot use `CASE` statements within `WHERE` clauses. 
+
+For example if you were trying to search a `boolean` by the string of its column name:
+
+`CASE WHEN users.admin IS TRUE THEN 'admin' ELSE  '' END`
+
+You will find it extremely difficult to work around this. Instead I strongly recommend handling your booleans seperately from the searching / search string.
+
+# Search Form / Views
+
+We do not provide built in view templates because this is a major restriction to applications. If your looking for starter template feel free to use the following example:
+
+- [examples/_search_form.html.slim](./examples/_search_form.html.slim)
+
 
 # Key Models Provided & Additional Customizations
 
@@ -111,35 +141,6 @@ A key aspect of this library is its simplicity and small API. For major function
 I strongly encourage you to read the code for this library to understand how it works within your project so that you are capable of customizing the functionality later.
 
 - [lib/search_architect/concerns/search_scope_concern.rb](./lib/search_architect/concerns/search_scope_concern.rb)
-
-# Search Form / View Example
-
-We do not provide built in view templates because this is a major restriction to applications. Instead we provide an optional simple copy-and-pasteable starter template.
-
-```slim
-- search_param_name = "search"
-- search_text = params[search_param_name]
-- search_path = local_assigns[:search_path] || request.path
-- back_path = local_assigns[:back_path] || request.path
-
-.table-utilities
-  .container-fluid
-    .row
-      .col-lg-7.col-md-7.col-sm-7.search-field-padding-offset
-        form#formSearch.search-form action=search_path method="get" 
-          .form-group.has-feedback
-            span.input-group
-              - if search_text.present?
-                span.input-group-btn
-                  a.btn.btn-danger href="#{back_path}"  Clear
-
-              input.form-control.input-lg.search-bar autofocus="" name=search_param_name placeholder="Search" type="text" value=search_text
-
-              span.input-group-btn
-                button.btn.btn-primary type="submit"
-                  i.fal.fa-search
-                  | Search
-```
 
 # Credits
 
