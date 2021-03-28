@@ -1,6 +1,8 @@
 class Post < ActiveRecord::Base
   include SearchArchitect
 
+  has_many :comments
+
   search_scope :search, attributes: [
     :id,
     :name,

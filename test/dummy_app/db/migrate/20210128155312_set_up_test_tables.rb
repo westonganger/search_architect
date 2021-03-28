@@ -9,6 +9,18 @@ class SetUpTestTables < migration_klass
   def change
     create_table :posts do |t|
       t.integer :a, :b
+      t.timestamps
+    end
+
+    create_table :comments do |t|
+      t.text :content
+      t.references :user, :post
+      t.timestamps
+    end
+
+    create_table :users do |t|
+      t.string :name
+      t.timestamps
     end
   end
 

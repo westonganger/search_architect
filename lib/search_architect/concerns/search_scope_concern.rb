@@ -56,9 +56,9 @@ module SearchArchitect
 
         recursive_add_association_to_joins = ->(current_reflection_or_klass:, assoc_reflection:){
           if assoc_reflection.belongs_to?
-            join_on = "ON #{current_reflection_or_klass.name}.#{assoc_reflection.foreign_key} = #{assoc_reflection.name}.#{assoc_reflection.primary_key}"
+            join_on = "ON #{current_reflection_or_klass.name}.#{assoc_reflection.association_foreign_key} = #{assoc_reflection.name}.#{assoc_reflection.association_primary_key}"
           else
-            join_on = "ON #{current_reflection_or_klass.name}.#{assoc_reflection.primary_key} = #{assoc_reflection.name}.#{assoc_reflection.foreign_key}"
+            join_on = "ON #{current_reflection_or_klass.name}.#{assoc_reflection.association_primary_key} = #{assoc_reflection.name}.#{assoc_reflection.association_foreign_key}"
           end
 
           sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_reflection.name} #{join_on}"
@@ -76,29 +76,33 @@ module SearchArchitect
             current_klass = current_reflection_or_klass.klass
             table_alias = current_reflection_or_klass.name
           else
-            current_klass = current_klass
+            current_klass = current_reflection_or_klass
             table_alias = current_klass.table_name
           end
 
-          attrs.each do |attr_entry|
-            if attrs.is_a?(Hash)
-              attrs.each do |assoc_name, inner_attrs|
-                assoc_reflection = current_klass.reflect_on_all_associations.detect{|x| x.name.to_s == assoc_name}
-
-                if assoc_reflection.nil?
-                  raise ArgumentError.new("Association '#{assoc_name}' not found on class '#{current_klass.name}'")
-                end
-
-                recursive_add_association_to_joins.call(
-                  current_reflection_or_klass: current_reflection_or_klass, 
-                  assoc_reflection: assoc_reflection,
-                )
-
-                recursive_add_to_sql_columns.call(assoc_reflection, inner_attrs) 
-              end
-            else
-              where_conditions << "(#{table_alias}.#{attr_entry} :comparison_operator :search)"
+          if [Symbol, String].include?(attrs.class)
+            where_conditions << "(#{table_alias}.#{attrs} :comparison_operator :search)"
+          elsif attrs.is_a?(Array)
+            attrs.each do |x|
+              recursive_add_to_sql_columns.call(current_klass, x) 
             end
+          elsif attrs.is_a?(Hash)
+            attrs.each do |assoc_name, inner_attrs|
+              assoc_reflection = current_klass.reflect_on_all_associations.detect{|x| x.name.to_s == assoc_name.to_s}
+
+              if assoc_reflection.nil?
+                raise ArgumentError.new("Association '#{assoc_name}' not found on class '#{current_klass.name}'")
+              end
+
+              recursive_add_association_to_joins.call(
+                current_reflection_or_klass: current_reflection_or_klass, 
+                assoc_reflection: assoc_reflection,
+              )
+
+              recursive_add_to_sql_columns.call(assoc_reflection, inner_attrs) 
+            end
+          else
+            raise "Error: #{attrs}" # TODO
           end
         }
 
@@ -125,14 +129,14 @@ module SearchArchitect
 
           case search_type
           when "full_search"
-            search_terms = [search_str]
+            search_array = [search_str]
           when "multi_search"
             ### SPLIT ON ALL WHITESPACE CHARACTERS
             orig_search_array = search_str.split(/\s/)
 
             search_array = []
 
-            char = '"'
+            quote_char = '"'
             start_quote_item_index = nil
 
             ### HANDLE DOUBLE QUOTED SEARCH ITEMS WITH SPACES
@@ -181,10 +185,10 @@ module SearchArchitect
           rel = self
 
           if !sql_joins.empty?
-            rel = rel.uniq.joins(*sql_joins.uniq)
+            rel = rel.joins(*sql_joins.uniq)
           end
 
-          search_terms.each do |q|
+          search_array.each do |q|
             ### SET SEARCH QUERY
             search_query = comparison_operator.include?("LIKE") ? "%#{q}%" : q
 
@@ -197,7 +201,7 @@ module SearchArchitect
           end
 
           next rel
-        })
+        }) ### END CREATE SCOPE
       end
 
     end
