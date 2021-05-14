@@ -55,9 +55,9 @@ end
 DATA = {}.with_indifferent_access
 
 DATA[:posts] = [
-  Post.find_or_create_by!(a: 1, b: 3),
-  Post.find_or_create_by!(a: 2, b: 2),
-  Post.find_or_create_by!(a: 3, b: 2),
-  Post.find_or_create_by!(a: 4, b: 1),
-  Post.find_or_create_by!(a: 5, b: 1),
+  Post.find_or_create_by!(title: 1, content: 3),
+  Post.find_or_create_by!(title: 2, content: 2),
+  Post.find_or_create_by!(title: 3, content: 2),
+  Post.find_or_create_by!(title: 4, content: 1),
+  Post.find_or_create_by!(title: 5, content: 1),
 ].shuffle

@@ -25,12 +25,12 @@ class SearchArchitectTest < ActiveSupport::TestCase
 
   def test_attributes
     Post.send(:search_scope, :search, attributes: [
-      :name, 
+      :title, 
       :content
     ])
 
     Post.send(:search_scope, :search, attributes: [
-      :name, 
+      :title, 
       :content, 
       {
         comments: [:content]
@@ -38,7 +38,7 @@ class SearchArchitectTest < ActiveSupport::TestCase
     ])
 
     Post.send(:search_scope, :search, attributes: [
-      :name, 
+      :title,
       :content, 
       {
         comments: [
@@ -61,36 +61,56 @@ class SearchArchitectTest < ActiveSupport::TestCase
   end
 
   def test_comparison_operators
+    Post.create!(title: "foo bar")
+    Post.create!(title: "bar")
+    assert Post.all.size > 2
+
     scope_name = "test_comparison_operators_1"
 
-    Post.send(:search_scope, scope_name, attributes: [])
+    Post.send(:search_scope, scope_name, attributes: [:title])
 
-    Post.send(scope_name, "foo bar", comparison_operator: "LIKE")
-    # TODO
-    
-    Post.send(scope_name, "foo bar", comparison_operator: "=")
-    # TODO
+    assert_equal Post.send(scope_name, "bar", comparison_operator: "=").size, 1
+
+    assert_equal Post.send(scope_name, "bar", comparison_operator: "LIKE").size, 2
+
+    if defined?(PG)
+      assert_equal Post.send(scope_name, "BAR", comparison_operator: "ILIKE").size, 2
+    else
+      assert_raise ArgumentError do
+        Post.send(scope_name, "BAR", comparison_operator: "ILIKE")
+      end
+    end
+
+    assert_raise ArgumentError do
+      Post.send(scope_name, "BAR", comparison_operator: "foobar")
+    end
   end
 
   def test_full_search
+    Post.create!(title: "foo-bar-baz")
+    assert Post.all.size > 1
+
     scope_name = "test_full_search"
 
-    Post.send(scope_name, "foo bar", search_type: "full_search")
+    Post.send(:search_scope, scope_name, attributes: [:title])
+
+    assert_equal Post.send(scope_name, "foo-bar", search_type: "full_search").size, 1
+    assert_equal Post.send(scope_name, "foo bar", search_type: "full_search").size, 0
   end
 
   def test_multi_search
+    Post.create!(title: "foo-bar-baz")
+    assert Post.all.size > 1
+
     scope_name = "test_multi_search"
 
-    Post.send(scope_name, "foo bar") ### TODO test returns multi search
+    Post.send(:search_scope, scope_name, attributes: [:title])
 
-    Post.send(scope_name, "foo bar", search_type: "multi_search")
+    assert_equal Post.send(scope_name, "foo-bar", search_type: "multi_search").size, 1
+    assert_equal Post.send(scope_name, "foo bar", search_type: "multi_search").size, 1
   end
 
   def test_quoted_multi_searching
-    # TODO
-  end
-
-  def test_search_lifecycle
     # TODO
   end
 

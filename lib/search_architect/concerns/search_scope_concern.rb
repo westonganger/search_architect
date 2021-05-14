@@ -2,15 +2,17 @@ module SearchArchitect
   module SearchScopeConcern
     extend ActiveSupport::Concern
 
+    included do
+      ### VALIDATES ACTIVE RECORD MODEL
+      unless (self < ActiveRecord::Base)
+        raise StandardError.new("Base class must be an ActiveRecord model")
+      end
+    end
+
     class_methods do
       private
 
       def search_scope(scope_name, sql_variables: [], attributes:)
-        ### VALIDATES ACTIVE RECORD MODEL
-        unless (self < ActiveRecord::Base)
-          raise StandardError.new("Base class must be an ActiveRecord model")
-        end
-
         ### VALIDATE SCOPE NAME
         if [String, Symbol].include?(scope_name.class)
           scope_name = scope_name.to_s
@@ -172,6 +174,7 @@ module SearchArchitect
             raise ArgumentError.new("Invalid :search_type. Valid options are: [:multi_search, :full_search]")
           end
 
+          ### VALIDATE REQUIRED SQL VARIABLES
           if sql_variables.is_a?(Hash)
             given_variables = sql_variables.keys.map{|x| x.to_s}.sort
 
