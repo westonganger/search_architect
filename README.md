@@ -30,24 +30,21 @@ class Post < ApplicationRecord
   has_many :comments
 
   search_scope :search, attributes: [
-    :name,
-
+    :title,
+    :content,
+    "CAST(#{self.table_name}.number AS VARCHAR)", # Must convert any non-string fields for searching
+    "#{self.table.name}.code", ### Plain SQL fully supported
     comments: [
       :content,
-
       author: [
         :first_name, 
         "author.last_name", # Associations SQL table alias equals the association name, not actual table name
         "CAST(author.number AS VARCHAR)"
         ],
     ],
-
-    "#{self.table.name}.code", ### Plain SQL fully supported
-
-    "CAST(#{self.table_name}.number AS VARCHAR)", # Must convert any non-string fields for searching
   ]
   
-  search_scope :search_with_locale, required_vars: [:locale], attributes: [
+  search_scope :search_with_locale, sql_variables: [:locale], attributes: [
     "#{self.table_name}.name_translations ->> :locale", # specify any variables as symbols, Ex. :locale
   ]
   
@@ -68,7 +65,6 @@ end
 You would now have access to the following searching methods:
 
 ```ruby
-### Multi Word Full-text Search, RECOMMENDED
 posts = Post.search(params[:search])
 
 posts = Post.search_with_locale(params[:search], sql_variables: {locale: @current_locale})
