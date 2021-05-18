@@ -22,36 +22,42 @@ class ErrorsTest < ActiveSupport::TestCase
 
   def test_sql_variables_validations
     ### DEFINITION
-    Post.send(:search_scope, "foobar", attributes: [])
-    Post.send(:search_scope, "foobar", attributes: [])
-    Post.send(:search_scope, "foobar", attributes: [])
-
     valid = [
-      "foobar",
-      :foobar,
+      ["foobar"],
+      [:foobar],
+      nil,
+      [],
     ]
 
     valid.each do |x|
-      assert Post.send(:search_scope, "foobar", attributes: [], sql_vars: [x])
+      assert Post.send(:search_scope, SecureRandom.hex(6), attributes: [:title], sql_variables: x)
     end
 
     invalid = [
-      nil,
+      "",
       1, 
       1.0, 
       BigDecimal(0),
-      [], 
       {}, 
+      [1], 
+      [nil], 
     ]
 
     invalid.each do |x|
       assert_raise ArgumentError do
-        Post.send(:search_scope, "foobar", attributes: [], sql_vars: [x])
+        Post.send(:search_scope, SecureRandom.hex(6), attributes: [:title], sql_variables: x)
       end
     end
     
     ### RUNTIME
-    # TODO
+    scope_name = "test_sql_variables_validations"
+    assert Post.send(:search_scope, SecureRandom.hex(6), attributes: [:title], sql_variables: [:test])
+
+    assert_raise ArgumentError do
+      assert Post.send(:search, scope_name, attributes: [:title], sql_variables: "test")
+    end
+
+    assert Post.send(:search, scope_name, sql_variables: {test: :foobar})
   end
 
   def test_attributes_validations
@@ -62,7 +68,7 @@ class ErrorsTest < ActiveSupport::TestCase
     ]
 
     valid.each do |x|
-      assert Post.send(:search_scope, "foobar", attributes: x)
+      assert Post.send(:search_scope, SecureRandom.hex(6), attributes: x)
     end
 
     invalid = [
@@ -77,7 +83,7 @@ class ErrorsTest < ActiveSupport::TestCase
 
     invalid.each do |x|
       assert_raise ArgumentError do
-        Post.send(:search_scope, "foobar", attributes: x)
+        Post.send(:search_scope, SecureRandom.hex(6), attributes: x)
       end
     end
   end
@@ -85,12 +91,12 @@ class ErrorsTest < ActiveSupport::TestCase
   def test_scope_name_validations
     ### DEFINITION
     valid_scope_names = [
-      "foobar", 
-      :foobar,
+      SecureRandom.hex(6), 
+      SecureRandom.hex(6).to_sym, 
     ]
 
     valid_scope_names.each do |scope_name|
-      assert Post.send(:search_scope, scope_name, attributes: [])
+      assert Post.send(:search_scope, scope_name, attributes: [:title])
     end
 
     invalid_scope_names = [
@@ -104,30 +110,28 @@ class ErrorsTest < ActiveSupport::TestCase
     ]
 
     invalid_scope_names.each do |scope_name|
-      Post.send(:search_scope, scope_name, attributes: [])
+      assert_raise ArgumentError do
+        Post.send(:search_scope, scope_name, attributes: [:title])
+      end
     end
-  end
-
-  def test_sql_variables_validations
-    ### DEFINITION
-    
-    ### RUNTIME
   end
 
   def test_attributes_validations
     ### DEFINITION
     valid = [
-      "foobar", 
-      :foobar,
+      [SecureRandom.hex(6).to_sym],
+      [SecureRandom.hex(6)],
     ]
 
     valid.each do |x|
-      assert Post.send(:search_scope, "foobar", attributes: x)
+      assert Post.send(:search_scope, SecureRandom.hex(6), attributes: x)
     end
 
     invalid = [
       nil,
       "",
+      SecureRandom.hex(6), 
+      SecureRandom.hex(6).to_sym,
       1, 
       1.0, 
       BigDecimal(0),
@@ -137,17 +141,17 @@ class ErrorsTest < ActiveSupport::TestCase
 
     invalid.each do |x|
       assert_raise ArgumentError do
-        Post.send(:search_scope, "foobar", attributes: x)
+        Post.send(:search_scope, SecureRandom.hex(6), attributes: x)
       end
     end
   end
 
   def test_comparison_operators_validations
+    scope_name = "test_comparison_operators_validations"
+
+    assert Post.send(:search_scope, scope_name, attributes: [:title])
+
     ### RUNTIME
-    scope_name = "test_comparison_operators_1"
-
-    assert Post.send(:search_scope, scope_name, attributes: [])
-
     assert Post.send(scope_name, "bar", comparison_operator: "=").count
     assert Post.send(scope_name, "bar", comparison_operator: "LIKE").count
 
@@ -165,10 +169,10 @@ class ErrorsTest < ActiveSupport::TestCase
   end
 
   def test_search_types_validations
-    ### RUNTIME
     scope_name = "test_search_type_validations"
-    Post.send(:search_scope, scope_name, attributes: [])
+    Post.send(:search_scope, scope_name, attributes: [:title])
     
+    ### RUNTIME
     assert Post.send(scope_name, "foo-bar", search_type: "full_search").count
 
     assert Post.send(scope_name, "foo-bar", search_type: "multi_search").count

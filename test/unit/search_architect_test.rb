@@ -24,12 +24,12 @@ class SearchArchitectTest < ActiveSupport::TestCase
   end
 
   def test_attributes
-    Post.send(:search_scope, :search, attributes: [
+    Post.send(:search_scope, SecureRandom.hex(6), attributes: [
       :title, 
       :content
     ])
 
-    Post.send(:search_scope, :search, attributes: [
+    Post.send(:search_scope, SecureRandom.hex(6), attributes: [
       :title, 
       :content, 
       {
@@ -37,7 +37,7 @@ class SearchArchitectTest < ActiveSupport::TestCase
       }
     ])
 
-    Post.send(:search_scope, :search, attributes: [
+    Post.send(:search_scope, SecureRandom.hex(6), attributes: [
       :title,
       :content, 
       {
@@ -75,14 +75,6 @@ class SearchArchitectTest < ActiveSupport::TestCase
 
     if defined?(PG)
       assert_equal Post.send(scope_name, "BAR", comparison_operator: "ILIKE").size, 2
-    else
-      assert_raise ArgumentError do
-        Post.send(scope_name, "BAR", comparison_operator: "ILIKE")
-      end
-    end
-
-    assert_raise ArgumentError do
-      Post.send(scope_name, "BAR", comparison_operator: "foobar")
     end
   end
 
@@ -106,12 +98,19 @@ class SearchArchitectTest < ActiveSupport::TestCase
 
     Post.send(:search_scope, scope_name, attributes: [:title])
 
-    assert_equal Post.send(scope_name, "foo-bar", search_type: "multi_search").size, 1
-    assert_equal Post.send(scope_name, "foo bar", search_type: "multi_search").size, 1
+    assert_equal Post.send(scope_name, "foo baz", search_type: "multi_search").size, 1
   end
 
   def test_quoted_multi_searching
-    # TODO
+    Post.create!(title: "foo-bar-baz")
+    assert Post.all.size > 1
+
+    search_str = '"foo baz"'
+    puts Post.search(search_str).to_sql
+
+    ### TODO, ActiveRecord::StatementInvalid: SQLite3::SQLException: near "posts": syntax error
+    assert_equal Post.search(search_str).size, 0
+    assert_equal Post.search(search_str[1..-2]).size, 1
   end
 
 end

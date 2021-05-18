@@ -14,17 +14,19 @@ module SearchArchitect
 
       def search_scope(scope_name, sql_variables: [], attributes:)
         ### VALIDATE SCOPE NAME
-        if [String, Symbol].include?(scope_name.class)
+        if scope_name.present? && [String, Symbol].include?(scope_name.class)
           scope_name = scope_name.to_s
         else
           raise ArgumentError.new("Scope name must be a String or Symbol")
         end
 
         ### VALIDATE SQL VARIABLES
-        if !sql_variables.is_a?(Array) || sql_variables.any?{|x| [Symbol, String].exclude?(x.class) }
-          raise ArgumentError.new("Invalid :sql_variables argument. Must be an array of symbols or strings")
-        else
-          required_sql_variables = sql_variables.map{|x| x.to_s}.sort
+        if sql_variables != nil
+          if !sql_variables.is_a?(Array) || sql_variables.any?{|x| [Symbol, String].exclude?(x.class) }
+            raise ArgumentError.new("Invalid :sql_variables argument. Must be an array of symbols or strings")
+          else
+            required_sql_variables = sql_variables.map{|x| x.to_s}.sort
+          end
         end
 
         ### VALIDATE ATTRIBUTES
@@ -34,7 +36,9 @@ module SearchArchitect
           end
 
           if !attrs.is_a?(Array)
-            raise ArgumentError.new("Invalid :attributes argument, #{attr_entry.to_s}")
+            raise ArgumentError.new("Invalid :attributes argument")
+          elsif attrs.empty?
+            raise ArgumentError.new("Invalid :attributes argument. Cannot be empty.")
           else
             attrs.each do |attr_entry|
               if attr_entry.is_a?(Hash)
@@ -44,7 +48,7 @@ module SearchArchitect
               elsif [String, Symbol].include?(attr_entry.class)
                 next
               else
-                raise ArgumentError.new("Invalid :attributes argument, #{attr_entry.to_s}")
+                raise ArgumentError.new("Invalid :attributes argument")
               end
             end
           end
@@ -57,10 +61,16 @@ module SearchArchitect
         sql_joins = []
 
         recursive_add_association_to_joins = ->(current_reflection_or_klass:, assoc_reflection:){
-          if assoc_reflection.belongs_to?
-            join_on = "ON #{current_reflection_or_klass.name}.#{assoc_reflection.association_foreign_key} = #{assoc_reflection.name}.#{assoc_reflection.association_primary_key}"
+          if current_reflection_or_klass.class.name.start_with?("ActiveRecord::Reflection::")
+            table_alias = current_reflection_or_klass.name
           else
-            join_on = "ON #{current_reflection_or_klass.name}.#{assoc_reflection.association_primary_key} = #{assoc_reflection.name}.#{assoc_reflection.association_foreign_key}"
+            table_alias = current_reflection_or_klass.table_name
+          end
+
+          if assoc_reflection.belongs_to?
+            join_on = "ON #{table_alias}.#{assoc_reflection.association_foreign_key} = #{assoc_reflection.name}.#{assoc_reflection.association_primary_key}"
+          else
+            join_on = "ON #{table_alias}.#{assoc_reflection.association_primary_key} = #{assoc_reflection.name}.#{assoc_reflection.association_foreign_key}"
           end
 
           sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_reflection.name} #{join_on}"
@@ -82,8 +92,10 @@ module SearchArchitect
             table_alias = current_klass.table_name
           end
 
-          if [Symbol, String].include?(attrs.class)
-            where_conditions << "(#{table_alias}.#{attrs} :comparison_operator :search)"
+          if attrs.class == Symbol
+            where_conditions << "(#{table_alias}.#{attrs} OPERATOR :search)"
+          elsif attrs.class == String
+            where_conditions << "(#{attrs} OPERATOR :search)"
           elsif attrs.is_a?(Array)
             attrs.each do |x|
               recursive_add_to_sql_columns.call(current_klass, x) 
@@ -104,7 +116,7 @@ module SearchArchitect
               recursive_add_to_sql_columns.call(assoc_reflection, inner_attrs) 
             end
           else
-            raise "Error: #{attrs}" # TODO
+            raise ArgumentError.new("Invalid :attributes argument")
           end
         }
 
@@ -152,7 +164,7 @@ module SearchArchitect
 
               elsif start_quote_item_index
                 if word.end_with?(quote_char)
-                  search_array << orig_search_array[start_quote_item_index..i][1..-2]
+                  search_array << orig_search_array[start_quote_item_index..i].join(" ")[1..-2]
 
                 elsif (orig_search_array_size == i+1)
                   num = ((orig_search_array_size-1) - start_quote_item_index)
@@ -175,14 +187,14 @@ module SearchArchitect
           end
 
           ### VALIDATE REQUIRED SQL VARIABLES
-          if sql_variables.is_a?(Hash)
-            given_variables = sql_variables.keys.map{|x| x.to_s}.sort
-
-            if given_variables != required_sql_variables
-              raise ArgumentError.new("Missing some :sql_variables keys. Requested variables are: #{required_sql_variables}")
+          if sql_variables != nil
+            if sql_variables.is_a?(Hash)
+              if !(required_sql_variables - sql_variables.keys.collect(&:to_s)).empty?
+                raise ArgumentError.new("Missing some :sql_variables keys. Requested variables are: #{required_sql_variables}")
+              end
+            else
+              raise ArgumentError.new("Invalid :sql_variables argument. Must be a Hash")
             end
-          else
-            raise ArgumentError.new("Invalid :sql_variables argument. Must be a Hash")
           end
 
           rel = self
@@ -196,8 +208,7 @@ module SearchArchitect
             search_query = comparison_operator.include?("LIKE") ? "%#{q}%" : q
 
             rel = rel.where(
-              where_conditions, 
-              comparison_operator: comparison_operator, 
+              where_conditions.gsub(" OPERATOR ", " #{comparison_operator} "),
               search: search_query,
               **sql_variables
             )
@@ -205,6 +216,8 @@ module SearchArchitect
 
           next rel
         }) ### END CREATE SCOPE
+
+        return true
       end
 
     end
