@@ -6,12 +6,12 @@ class Post < ActiveRecord::Base
   search_scope :search, attributes: [
     :id,
     :title,
-    "CAST(#{table_name}.created_at AS varchar)",
+    "CAST(#{table_name}.created_at AS CHAR)",
     comments: [
       :content,
       user: [
         :name,
-        "CAST(#{self.connection.quote_table_name("#{table_name}.id")} AS varchar)", ### when using a SQL string, we have to quote the table_name because `user` is a reserved SQL keyword
+        "CAST(#{self.connection.quote_table_name("#{table_name}.id")} AS CHAR)", ### when using a SQL string, we have to quote the table_name because `user` is a reserved SQL keyword
       ]
     ]
   ]

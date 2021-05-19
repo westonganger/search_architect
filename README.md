@@ -33,7 +33,7 @@ class Post < ApplicationRecord
     :title,
     :content,
     :number, ### non-string fields are automatically converted to a searchable type using sql CAST method
-    "CAST((#{self.table.name}.number+100) AS VARCHAR)", ### Plain SQL fully supported
+    "CAST((#{self.table.name}.number+100) AS CHAR)", ### Plain SQL fully supported
     :created_at, ### automatically converts date/time fields to searchable string type using sql CAST method, uses default db output format by default
     comments: [
       :content,
@@ -110,8 +110,8 @@ The default is `ILIKE` if Postgresql or `LIKE` if non-postgres. Current valid op
 # SQL Type Casting Cheatsheet
 
 - Most Types:
-  - `CAST(posts.number AS VARCHAR)`
-  - `CAST(posts.created_at AS VARCHAR)` - uses default db output format by default
+  - `CAST(posts.number AS CHAR)`
+  - `CAST(posts.created_at AS CHAR)` - uses default db output format by default
 - Custom Date/Time Formatting:
   - Postgresql, Oracle
     - `TO_CHAR(posts.created_at, 'YYYY-mm-dd')`

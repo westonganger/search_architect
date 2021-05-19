@@ -68,7 +68,7 @@ class ErrorsTest < ActiveSupport::TestCase
     valid = [
       "id", 
       :title,
-      "CAST(number AS varchar)", 
+      "CAST(number AS CHAR)", 
       "posts.content",
       "missing_attribute",
       "posts.missing_attribute",

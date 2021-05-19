@@ -3,7 +3,7 @@
 ## SQL Type Casting Cheatsheet
 
 - Numbers:
-  - `CAST(posts.number AS VARCHAR)`
+  - `CAST(posts.number AS CHAR)`
 - Date / Time:
   - Postgresql, Oracle
     - `TO_CHAR(posts.created_at, 'YYYY-mm-dd')`

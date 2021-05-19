@@ -111,7 +111,7 @@ module SearchArchitect
             when "string", "text"
               where_conditions << "(#{self.connection.quote_table_name(table_alias)}.#{self.connection.quote_column_name(attrs)} OPERATOR :search)"
             else
-              where_conditions << "(CAST(#{self.connection.quote_table_name(table_alias)}.#{self.connection.quote_column_name(attrs)} AS varchar) OPERATOR :search)"
+              where_conditions << "(CAST(#{self.connection.quote_table_name(table_alias)}.#{self.connection.quote_column_name(attrs)} AS CHAR) OPERATOR :search)"
             end
           when "String"
             where_conditions << "(#{attrs} OPERATOR :search)"
