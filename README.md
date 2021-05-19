@@ -32,15 +32,15 @@ class Post < ApplicationRecord
   search_scope :search, attributes: [
     :title,
     :content,
-    "CAST(#{self.table_name}.number AS VARCHAR)", # Must convert any non-string fields for searching
-    "#{self.table.name}.code", ### Plain SQL fully supported
+    :number, ### non-string fields are automatically converted to a searchable type using sql CAST method
+    "CAST((#{self.table.name}.number+100) AS VARCHAR)", ### Plain SQL fully supported
+    :created_at, ### automatically converts date/time fields to searchable string type using sql CAST method, uses default db output format by default
     comments: [
       :content,
       author: [
         :first_name, 
-        "author.last_name", # Associations SQL table alias equals the association name, not actual table name
-        "CAST(author.number AS VARCHAR)"
-        ],
+        "author.last_name", # Associations SQL table alias always equals the association name, not actual table name
+      ],
     ],
   ]
   
@@ -48,7 +48,7 @@ class Post < ApplicationRecord
     "#{self.table_name}.name_translations ->> :locale", # specify any variables as symbols, Ex. :locale
   ]
   
-  search_scope :search_date_example, attributes: [
+  search_scope :search_custom_date_format, attributes: [
     # PostgreSQL, Oracle
     "TO_CHAR(#{self.table_name}.approved_at, 'YYYY-mm-dd')",
     
@@ -56,7 +56,7 @@ class Post < ApplicationRecord
     "DATE_FORMAT(#{self.table_name}.approved_at, '%Y-%m-%d')",
     
     # SQLite
-    "strftime(#{self.table_name}.approved, '%Y-%m-%d')",
+    "strftime(#{self.table_name}.approved_at, '%Y-%m-%d')",
   ]
 
 end
@@ -77,6 +77,12 @@ We includes two different searching types:
 ### Multi Word Full-text Search
 
 Recommended. Split words on whitespace characters, Quoting is allowed to combine words
+
+The following type of queries are supported:
+
+- `foo` (rows must include foo)
+- `foo bar` (rows must include both foo and bar)
+- `"foo bar"` (rows must include the phrase "foo bar")
 
 ```ruby
 posts = Post.search(params[:search], search_type: :multi_search)
@@ -103,9 +109,10 @@ The default is `ILIKE` if Postgresql or `LIKE` if non-postgres. Current valid op
 
 # SQL Type Casting Cheatsheet
 
-- Numbers:
+- Most Types:
   - `CAST(posts.number AS VARCHAR)`
-- Date / Time:
+  - `CAST(posts.created_at AS VARCHAR)` - uses default db output format by default
+- Custom Date/Time Formatting:
   - Postgresql, Oracle
     - `TO_CHAR(posts.created_at, 'YYYY-mm-dd')`
   - MySQL
@@ -113,15 +120,15 @@ The default is `ILIKE` if Postgresql or `LIKE` if non-postgres. Current valid op
   - SQLite
     `strftime(posts.created_at, '%Y-%m-%d')`
 
-#### Limitation: CASE Statements in WHERE Clauses
+#### Limitation: Boolean columns
 
-Apparently SQL has the restriction where you cannot use `CASE` statements within `WHERE` clauses. 
+Boolean columns are only searched by their true/false value. Searching boolean fields by the column name is not possible because apparently SQL has the restriction where you cannot use `CASE` statements within `WHERE` clauses. 
 
 For example if you were trying to search a `boolean` by the string of its column name:
 
 `CASE WHEN users.admin IS TRUE THEN 'admin' ELSE  '' END`
 
-You will find it extremely difficult to work around this. Instead I strongly recommend handling your booleans seperately from the searching / search string.
+You will find it extremely difficult to work around this. Instead I strongly recommend handling your booleans filtering logic seperately from your search logic.
 
 # Search Form / Views
 

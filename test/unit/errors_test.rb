@@ -30,7 +30,9 @@ class ErrorsTest < ActiveSupport::TestCase
     ]
 
     valid.each do |x|
-      assert Post.send(:search_scope, SecureRandom.hex(6), attributes: [:title], sql_variables: x)
+      append_error_message " - #{x}" do
+        assert Post.send(:search_scope, SecureRandom.hex(6), attributes: [:title], sql_variables: x)
+      end
     end
 
     invalid = [
@@ -62,13 +64,20 @@ class ErrorsTest < ActiveSupport::TestCase
 
   def test_attributes_validations
     ### DEFINITION
+    
     valid = [
-      "foobar", 
-      :foobar,
+      "id", 
+      :title,
+      "CAST(number AS varchar)", 
+      "posts.content",
+      "missing_attribute",
+      "posts.missing_attribute",
     ]
 
     valid.each do |x|
-      assert Post.send(:search_scope, SecureRandom.hex(6), attributes: x)
+      append_error_message " - #{x}" do
+        assert Post.send(:search_scope, SecureRandom.hex(6), attributes: [x])
+      end
     end
 
     invalid = [
@@ -79,12 +88,58 @@ class ErrorsTest < ActiveSupport::TestCase
       BigDecimal(0),
       [], 
       {}, 
+      :missing_attribute,
     ]
 
     invalid.each do |x|
-      assert_raise ArgumentError do
-        Post.send(:search_scope, SecureRandom.hex(6), attributes: x)
+      append_error_message " - #{x}" do
+        assert_raise ArgumentError do
+          Post.send(:search_scope, SecureRandom.hex(6), attributes: [x])
+        end
       end
+    end
+
+    #### NESTED
+    assert Post.send(:search_scope, SecureRandom.hex(6), attributes: [
+      :title,
+      :content, 
+      {
+        comments: [
+          :content, 
+          user: [
+            :name, 
+            :created_at,
+          ]
+        ]
+      }
+    ])
+
+    assert_raise ArgumentError do
+      Post.send(:search_scope, SecureRandom.hex(6), attributes: [
+        :title,
+        :content, 
+        {
+          comments: [
+            user: [
+              :missing_attribute, 
+            ]
+          ]
+        }
+      ])
+    end
+
+    assert_raise ArgumentError do
+      Post.send(:search_scope, SecureRandom.hex(6), attributes: [
+        :title,
+        :content, 
+        {
+          comments: [
+            user: [
+              true, 
+            ]
+          ]
+        }
+      ])
     end
   end
 
@@ -96,7 +151,9 @@ class ErrorsTest < ActiveSupport::TestCase
     ]
 
     valid_scope_names.each do |scope_name|
-      assert Post.send(:search_scope, scope_name, attributes: [:title])
+      append_error_message " - #{scope_name}" do
+        assert Post.send(:search_scope, scope_name, attributes: [:title])
+      end
     end
 
     invalid_scope_names = [
@@ -112,36 +169,6 @@ class ErrorsTest < ActiveSupport::TestCase
     invalid_scope_names.each do |scope_name|
       assert_raise ArgumentError do
         Post.send(:search_scope, scope_name, attributes: [:title])
-      end
-    end
-  end
-
-  def test_attributes_validations
-    ### DEFINITION
-    valid = [
-      [SecureRandom.hex(6).to_sym],
-      [SecureRandom.hex(6)],
-    ]
-
-    valid.each do |x|
-      assert Post.send(:search_scope, SecureRandom.hex(6), attributes: x)
-    end
-
-    invalid = [
-      nil,
-      "",
-      SecureRandom.hex(6), 
-      SecureRandom.hex(6).to_sym,
-      1, 
-      1.0, 
-      BigDecimal(0),
-      [], 
-      {}, 
-    ]
-
-    invalid.each do |x|
-      assert_raise ArgumentError do
-        Post.send(:search_scope, SecureRandom.hex(6), attributes: x)
       end
     end
   end

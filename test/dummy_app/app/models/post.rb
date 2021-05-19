@@ -5,8 +5,8 @@ class Post < ActiveRecord::Base
 
   search_scope :search, attributes: [
     :id,
-    :name,
-    "(CAST #{table_name}.created_at AS varchar)",
+    :title,
+    "CAST(#{table_name}.created_at AS varchar)",
     comments: [
       :content,
       user: [

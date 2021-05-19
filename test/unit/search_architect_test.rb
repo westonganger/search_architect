@@ -23,35 +23,6 @@ class SearchArchitectTest < ActiveSupport::TestCase
     assert Post.private_methods.include?(:search_scope)
   end
 
-  def test_attributes
-    Post.send(:search_scope, SecureRandom.hex(6), attributes: [
-      :title, 
-      :content
-    ])
-
-    Post.send(:search_scope, SecureRandom.hex(6), attributes: [
-      :title, 
-      :content, 
-      {
-        comments: [:content]
-      }
-    ])
-
-    Post.send(:search_scope, SecureRandom.hex(6), attributes: [
-      :title,
-      :content, 
-      {
-        comments: [
-          :content, 
-          user: [
-            :first_name, 
-            :last_name,
-          ]
-        ]
-      }
-    ])
-  end
-
   def test_default_comparison_operator
     if defined?(PG)
       Post.search("foobar").to_sql.include?(" ILIKE ")
@@ -60,7 +31,7 @@ class SearchArchitectTest < ActiveSupport::TestCase
     end
   end
 
-  def test_comparison_operators
+  def test_comparison_operators_results
     Post.create!(title: "foo bar")
     Post.create!(title: "bar")
     assert Post.all.size > 2
@@ -78,7 +49,7 @@ class SearchArchitectTest < ActiveSupport::TestCase
     end
   end
 
-  def test_full_search
+  def test_full_search_results
     Post.create!(title: "foo-bar-baz")
     assert Post.all.size > 1
 
@@ -90,7 +61,7 @@ class SearchArchitectTest < ActiveSupport::TestCase
     assert_equal Post.send(scope_name, "foo bar", search_type: "full_search").size, 0
   end
 
-  def test_multi_search
+  def test_multi_search_results
     Post.create!(title: "foo-bar-baz")
     assert Post.all.size > 1
 
@@ -101,14 +72,12 @@ class SearchArchitectTest < ActiveSupport::TestCase
     assert_equal Post.send(scope_name, "foo baz", search_type: "multi_search").size, 1
   end
 
-  def test_quoted_multi_searching
+  def test_quoted_multi_searching_results
     Post.create!(title: "foo-bar-baz")
     assert Post.all.size > 1
 
     search_str = '"foo baz"'
-    puts Post.search(search_str).to_sql
 
-    ### TODO, ActiveRecord::StatementInvalid: SQLite3::SQLException: near "posts": syntax error
     assert_equal Post.search(search_str).size, 0
     assert_equal Post.search(search_str[1..-2]).size, 1
   end

@@ -68,9 +68,9 @@ module SearchArchitect
           end
 
           if assoc_reflection.belongs_to?
-            join_on = "ON #{table_alias}.#{assoc_reflection.association_foreign_key} = #{assoc_reflection.name}.#{assoc_reflection.association_primary_key}"
+            join_on = "ON #{table_alias}.#{assoc_reflection.foreign_key} = #{assoc_reflection.name}.#{assoc_reflection.association_primary_key}"
           else
-            join_on = "ON #{table_alias}.#{assoc_reflection.association_primary_key} = #{assoc_reflection.name}.#{assoc_reflection.association_foreign_key}"
+            join_on = "ON #{table_alias}.#{assoc_reflection.association_primary_key} = #{assoc_reflection.name}.#{assoc_reflection.foreign_key}"
           end
 
           sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_reflection.name} #{join_on}"
@@ -92,15 +92,34 @@ module SearchArchitect
             table_alias = current_klass.table_name
           end
 
-          if attrs.class == Symbol
-            where_conditions << "(#{table_alias}.#{attrs} OPERATOR :search)"
-          elsif attrs.class == String
+          if attrs.blank?
+            ### Applies to String, Array and Hash
+            attrs = nil
+          end
+          
+          if attrs.is_a?(String) && current_klass.columns_hash[attrs]
+            attrs = attrs.to_sym
+          end
+
+          case attrs.class.to_s
+          when "Symbol"
+            if current_klass.columns_hash[attrs.to_s].nil?
+              raise ArgumentError.new("Attribute `:#{attrs}` not found on model #{current_klass.name}")
+            end
+
+            case current_klass.columns_hash[attrs.to_s].type.to_s
+            when "string", "text"
+              where_conditions << "(#{table_alias}.#{attrs} OPERATOR :search)"
+            else
+              where_conditions << "(CAST(#{table_alias}.#{attrs} AS varchar) OPERATOR :search)"
+            end
+          when "String"
             where_conditions << "(#{attrs} OPERATOR :search)"
-          elsif attrs.is_a?(Array)
+          when "Array"
             attrs.each do |x|
               recursive_add_to_sql_columns.call(current_klass, x) 
             end
-          elsif attrs.is_a?(Hash)
+          when "Hash"
             attrs.each do |assoc_name, inner_attrs|
               assoc_reflection = current_klass.reflect_on_all_associations.detect{|x| x.name.to_s == assoc_name.to_s}
 
@@ -116,7 +135,7 @@ module SearchArchitect
               recursive_add_to_sql_columns.call(assoc_reflection, inner_attrs) 
             end
           else
-            raise ArgumentError.new("Invalid :attributes argument")
+            raise ArgumentError.new("Invalid :attributes argument, #{attrs}")
           end
         }
 
@@ -129,7 +148,7 @@ module SearchArchitect
 
         case connection.adapter_name.downcase.to_s
         when "postgresql"
-          valid_operators.unshift("ILIKE")
+          valid_comparison_operators.unshift("ILIKE")
         end
 
         ### SET DEFAULT COMPARISON OPERATOR
@@ -145,43 +164,7 @@ module SearchArchitect
           when "full_search"
             search_array = [search_str]
           when "multi_search"
-            ### SPLIT ON ALL WHITESPACE CHARACTERS
-            orig_search_array = search_str.split(/\s/)
-
-            search_array = []
-
-            quote_char = '"'
-            start_quote_item_index = nil
-
-            ### HANDLE DOUBLE QUOTED SEARCH ITEMS WITH SPACES
-            orig_search_array.each_with_index do |word, i|
-              if start_quote_item_index.nil? && word.start_with?(quote_char)
-                if word.end_with?(quote_char)
-                  search_array << word[1..-2]
-                else
-                  start_quote_item_index = i
-                end
-
-              elsif start_quote_item_index
-                if word.end_with?(quote_char)
-                  search_array << orig_search_array[start_quote_item_index..i].join(" ")[1..-2]
-
-                elsif (orig_search_array_size == i+1)
-                  num = ((orig_search_array_size-1) - start_quote_item_index)
-
-                  num.times do |i|
-                    search_array << orig_search_array[i+start_quote_item_index]
-                  end
-
-                else
-                  next
-                end
-
-              else
-                search_array << word
-              end
-            end
-
+            search_array = SearchArchitect.split_string_to_words(search_str)
           else
             raise ArgumentError.new("Invalid :search_type. Valid options are: [:multi_search, :full_search]")
           end

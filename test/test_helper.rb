@@ -34,7 +34,7 @@ Minitest::Reporters.use!(
 
 require "minitest/autorun"
 
-# Run any available migration
+############################################################### MIGRATIONS AND DATA
 if ActiveRecord.gem_version >= Gem::Version.new("6.0")
   ActiveRecord::MigrationContext.new(File.expand_path("dummy_app/db/migrate/", __dir__), ActiveRecord::SchemaMigration).migrate
 elsif ActiveRecord.gem_version >= Gem::Version.new("5.2")
@@ -61,3 +61,20 @@ DATA[:posts] = [
   Post.find_or_create_by!(title: 4, content: 1),
   Post.find_or_create_by!(title: 5, content: 1),
 ].shuffle
+
+############################################################### HELPER METHODS
+def append_error_message(msg, &block)
+  exceptions = [
+    #RSpec::Expectations::ExpectationNotMetError,
+    #Capybara::ElementNotFound,
+    Minitest::Assertion,
+  ]
+
+  begin
+    block.call
+  rescue *exceptions => e
+    e.message << "\n#{msg}"
+
+    raise e
+  end
+end
