@@ -117,7 +117,7 @@ module SearchArchitect
             where_conditions << "(#{attrs} OPERATOR :search)"
           when "Array"
             attrs.each do |x|
-              recursive_add_to_sql_columns.call(current_klass, x) 
+              recursive_add_to_sql_columns.call(current_reflection_or_klass, x) 
             end
           when "Hash"
             attrs.each do |assoc_name, inner_attrs|
