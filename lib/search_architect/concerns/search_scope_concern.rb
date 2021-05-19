@@ -68,12 +68,12 @@ module SearchArchitect
           end
 
           if assoc_reflection.belongs_to?
-            join_on = "ON #{table_alias}.#{assoc_reflection.foreign_key} = #{assoc_reflection.name}.#{assoc_reflection.association_primary_key}"
+            join_on = "ON `#{table_alias}`.`#{assoc_reflection.foreign_key}` = `#{assoc_reflection.name}`.`#{assoc_reflection.association_primary_key}`"
           else
-            join_on = "ON #{table_alias}.#{assoc_reflection.association_primary_key} = #{assoc_reflection.name}.#{assoc_reflection.foreign_key}"
+            join_on = "ON `#{table_alias}`.`#{assoc_reflection.association_primary_key}` = `#{assoc_reflection.name}`.`#{assoc_reflection.foreign_key}`"
           end
 
-          sql_joins << "LEFT OUTER JOIN #{assoc_reflection.table_name} AS #{assoc_reflection.name} #{join_on}"
+          sql_joins << "LEFT OUTER JOIN `#{assoc_reflection.table_name}` AS `#{assoc_reflection.name}` #{join_on}"
 
           if assoc_reflection.through_reflection
             recursive_add_association_to_joins.call(
@@ -109,9 +109,9 @@ module SearchArchitect
 
             case current_klass.columns_hash[attrs.to_s].type.to_s
             when "string", "text"
-              where_conditions << "(#{table_alias}.#{attrs} OPERATOR :search)"
+              where_conditions << "(`#{table_alias}`.`#{attrs}` OPERATOR :search)"
             else
-              where_conditions << "(CAST(#{table_alias}.#{attrs} AS varchar) OPERATOR :search)"
+              where_conditions << "(CAST(`#{table_alias}`.`#{attrs}` AS varchar) OPERATOR :search)"
             end
           when "String"
             where_conditions << "(#{attrs} OPERATOR :search)"
