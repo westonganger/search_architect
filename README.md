@@ -28,6 +28,7 @@ class Post < ApplicationRecord
   include SearchArchitect
   
   has_many :comments
+  has_many :comment_authors, through: :comments
 
   search_scope :search, attributes: [
     :title,
@@ -35,12 +36,16 @@ class Post < ApplicationRecord
     :number, ### non-string fields are automatically converted to a searchable type using sql CAST method
     "CAST((#{self.table.name}.number+100) AS CHAR)", ### Plain SQL fully supported
     :created_at, ### automatically converts date/time fields to searchable string type using sql CAST method, uses default db output format by default
+    author: [
+      :first_name, 
+      "author.last_name",
+    ],
     comments: [
       :content,
-      author: [
-        :first_name, 
-        "author.last_name", # Associations SQL table alias always equals the association name, not actual table name
-      ],
+    ],
+    comment_authors: [
+      :first_name, 
+      "comment_authors.last_name", # Associations SQL table alias always equals the association name, not actual table name
     ],
   ]
   
