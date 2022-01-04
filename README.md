@@ -57,21 +57,8 @@ class Post < ApplicationRecord
         "users.name",
 
         comments: [
-          ### For Example:
-          ### When multiple associations reference the same table, Rails will alias as
-          ###   - For has_many/has_one relationships "<table>_<relationship_table_name>"
-          ###   - For belongs_to relationships "<relationship_table_name>_<table>"
-          ###
-
-          "CAST((comments_users.number+100) AS CHAR)", ### Plain SQL fully supported
-          "comments_users.content", 
-
-          user: [
-            comments: [
-              "comments_user_comments.content", ### Example
-
-            ]
-          ]
+          {table_alias: "users_comments"}, ### Must manually specify a table_alias when we have multiple associations referencing the same table
+          "users_comments.content", 
         ],
       ]
     ],
