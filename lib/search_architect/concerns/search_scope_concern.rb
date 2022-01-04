@@ -59,14 +59,31 @@ module SearchArchitect
         ### GENERATE WHERE CONDITIONS AND LEFT JOINS
         where_conditions = []
         join_associations = []
+
+        recursive_add_association_to_joins = ->(current_reflection_or_klass:, table_alias:, assoc_reflection:, assoc_table_alias:){
+          if assoc_reflection.belongs_to?
+            join_on = "ON #{self.connection.quote_table_name(table_aliase)}.#{self.connection.quote_column_name(assoc_reflection.foreign_key)} = #{self.connection.quote_table_name(assoc_table_alias)}.#{self.connection.quote_column_name(assoc_reflection.primary_key)}"
+          else
+            join_on = "ON #{self.connection.quote_table_name(table_alias)}.#{self.connection.quote_column_name(assoc_reflection.primary_key)} = #{self.connection.quote_table_name(assoc_table_alias)}.#{self.connection.quote_column_name(assoc_reflection.foreign_key)}"
+          end
+
+          join_associations << "LEFT OUTER JOIN #{self.connection.quote_table_name(assoc_reflection.table_name)} AS #{assoc_table_alias} #{join_on}"
+
+          if assoc_reflection.through_reflection
+            recursive_add_association_to_joins.call(
+              current_reflection_or_klass: assoc_reflection, 
+              table_alias: assoc_table_alias,
+              assoc_reflection: assoc_reflection.through_reflection,
+              assoc_table_alias: "#{assoc_reflection.through_reflection.klass.table_name}_#{join_associations.size}",
+            )
+          end
+        }
         
-        recursive_add_to_sql_columns = ->(current_reflection_or_klass, attrs, final_run: false){
+        recursive_add_to_sql_columns = ->(current_reflection_or_klass, attrs, table_alias:){
           if current_reflection_or_klass.class.name.start_with?("ActiveRecord::Reflection::")
             current_klass = current_reflection_or_klass.klass
-            table_alias = current_reflection_or_klass.name
           else
             current_klass = current_reflection_or_klass
-            table_alias = current_klass.table_name
           end
 
           if attrs.blank?
@@ -93,14 +110,10 @@ module SearchArchitect
           when "String"
             where_conditions << "(#{attrs} OPERATOR :search)"
           when "Array"
-            attrs.each do |x|
+            attrs.each_with_index do |x|
               recursive_add_to_sql_columns.call(current_reflection_or_klass, x) 
             end
           when "Hash"
-            if final_run
-              raise ArgumentError.new("Invalid search_scope definition. Does not support nested associations, please use a :through association instead.")
-            end
-
             attrs.each do |assoc_name, inner_attrs|
               assoc_reflection = current_klass.reflect_on_all_associations.detect{|x| x.name.to_s == assoc_name.to_s}
 
@@ -108,18 +121,31 @@ module SearchArchitect
                 raise ArgumentError.new("Association '#{assoc_name}' not found on class '#{current_klass.name}'")
               end
 
-              arel_table_alias = assoc_reflection.klass.arel_table.alias(assoc_name)
+              if inner_attrs.is_a?(Array)
+                table_opts_hash = inner_attrs.delete{|x| x.is_a?(Hash) && x.has_key?(:table_alias) }
+              end
 
-              join_associations << "LEFT OUTER JOIN #{self.connection.quote_table_name(assoc_reflection.klass.table_name)} ON #{} #{} AS"
+              assoc_table_alias = table_opts_hash ? table_opts_hash[:table_alias] : assoc_reflection.klass.table_name
 
-              recursive_add_to_sql_columns.call(assoc_reflection, inner_attrs, final_run: true) 
+              if join_table_names.include?(assoc_table_alias)
+                raise ArgumentError.new("Duplicate join table '#{assoc_table_alias}' found within search definition, please use the :table_alias option")
+              end
+
+              recursive_add_association_to_joins.call(
+                current_reflection_or_klass: current_reflection_or_klass, 
+                table_alias: table_alias,
+                assoc_reflection: assoc_reflection,
+                assoc_table_alias: assoc_table_alias,
+              )
+
+              recursive_add_to_sql_columns.call(assoc_reflection, inner_attrs, table_alias: join_table_alias) 
             end
           else
             raise ArgumentError.new("Invalid :attributes argument, #{attrs}")
           end
         }
 
-        recursive_add_to_sql_columns.call(self, attributes)
+        recursive_add_to_sql_columns.call(self, attributes, table_alias: self.table_name)
 
         where_conditions = where_conditions.join(" OR ")
 
@@ -135,12 +161,12 @@ module SearchArchitect
         default_comparison_operator = valid_comparison_operators.first # default is ILIKE or LIKE
 
         ### CREATE THE SCOPE
-        scope(scope_name, ->(search_str, search_type: "multi_search", comparison_operator: default_comparison_operator, sql_variables: {}){
+        scope(scope_name, ->(search_str, search_type: "full_search", comparison_operator: default_comparison_operator, sql_variables: {}){
           if valid_comparison_operators.exclude?(comparison_operator)
             raise ArgumentError.new("Invalid argument for :comparison_operator. Valid options are: #{valid_comparison_operators}")
           end
 
-          case search_type
+          case search_type.to_s
           when "full_search"
             search_array = [search_str]
           when "multi_search"

@@ -24,28 +24,56 @@ Then add `include SearchArchitect` to your ApplicationRecord or models.
 You can define any search scopes on your model using the following:
 
 ```ruby
+class Comment < ApplicationRecord
+  include SearchArchitect
+  
+  has_many :comments
+end
+
+class Comment < ApplicationRecord
+  include SearchArchitect
+  
+  belongs_to :user
+  belongs_to :post
+end
+
 class Post < ApplicationRecord
   include SearchArchitect
   
   has_many :comments
-  has_many :comment_authors, through: :comments
 
   search_scope :search, attributes: [
     :title,
     :content,
     :number, ### non-string fields are automatically converted to a searchable type using sql CAST method
-    "CAST((#{self.table.name}.number+100) AS CHAR)", ### Plain SQL fully supported
+    "CAST((#{self.table_name}.number+100) AS CHAR)", ### Plain SQL fully supported
     :created_at, ### automatically converts date/time fields to searchable string type using sql CAST method, uses default db output format by default
-    author: [
-      :first_name, 
-      "author.last_name",
-    ],
+
     comments: [
+      :number,
       :content,
-    ],
-    comment_authors: [
-      :first_name, 
-      "comment_authors.last_name", # Associations SQL table alias always equals the association name, not actual table name
+
+      user: [
+        "users.name",
+
+        comments: [
+          ### For Example:
+          ### When multiple associations reference the same table, Rails will alias as
+          ###   - For has_many/has_one relationships "<table>_<relationship_table_name>"
+          ###   - For belongs_to relationships "<relationship_table_name>_<table>"
+          ###
+
+          "CAST((comments_users.number+100) AS CHAR)", ### Plain SQL fully supported
+          "comments_users.content", 
+
+          user: [
+            comments: [
+              "comments_user_comments.content", ### Example
+
+            ]
+          ]
+        ],
+      ]
     ],
   ]
   
@@ -79,6 +107,16 @@ posts = Post.search_with_locale(params[:search], sql_variables: {locale: @curren
 
 We includes two different searching types:
 
+### Full String Search
+
+Considers entire string as one search. In my experience this is the natural choice however the multi-search proves to be very powerful.
+
+```ruby
+posts = Post.search(params[:search], search_type: :full_search)
+### OR
+posts = Post.search(params[:search]) # defaults to :full_search
+```
+
 ### Multi Word Full-text Search
 
 Recommended. Split words on whitespace characters, Quoting is allowed to combine words
@@ -91,15 +129,6 @@ The following type of queries are supported:
 
 ```ruby
 posts = Post.search(params[:search], search_type: :multi_search)
-### OR
-posts = Post.search(params[:search]) # defaults to :multi_search
-```
-
-### Full String Search
-
-Considers entire string as one search. In my experience this is the natural choice however the multi-search proves to be very powerful.
-```ruby
-posts = Post.search(params[:search], search_type: :full_search)
 ```
 
 # Comparison Operators

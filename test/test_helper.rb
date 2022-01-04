@@ -34,33 +34,7 @@ Minitest::Reporters.use!(
 
 require "minitest/autorun"
 
-############################################################### MIGRATIONS AND DATA
-if ActiveRecord.gem_version >= Gem::Version.new("6.0")
-  ActiveRecord::MigrationContext.new(File.expand_path("dummy_app/db/migrate/", __dir__), ActiveRecord::SchemaMigration).migrate
-elsif ActiveRecord.gem_version >= Gem::Version.new("5.2")
-  ActiveRecord::MigrationContext.new(File.expand_path("dummy_app/db/migrate/", __dir__)).migrate
-else
-  ActiveRecord::Migrator.migrate File.expand_path("dummy_app/db/migrate/", __dir__)
-end
-
-[Post].each do |klass|
-  if defined?(SQLite3)
-    ActiveRecord::Base.connection.execute("DELETE FROM #{klass.table_name};")
-    ActiveRecord::Base.connection.execute("UPDATE `sqlite_sequence` SET `seq` = 0 WHERE `name` = '#{klass.table_name}';")
-  else
-    ActiveRecord::Base.connection.execute("TRUNCATE TABLE #{klass.table_name}")
-  end
-end
-
-DATA = {}.with_indifferent_access
-
-DATA[:posts] = [
-  Post.find_or_create_by!(title: 1, content: 3),
-  Post.find_or_create_by!(title: 2, content: 2),
-  Post.find_or_create_by!(title: 3, content: 2),
-  Post.find_or_create_by!(title: 4, content: 1),
-  Post.find_or_create_by!(title: 5, content: 1),
-].shuffle
+require 'migrate_and_seed'
 
 ############################################################### HELPER METHODS
 def append_error_message(msg, &block)
