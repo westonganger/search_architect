@@ -2,7 +2,7 @@
 
 <a href="https://badge.fury.io/rb/search_architect" target="_blank"><img height="21" style='border:0px;height:21px;' border='0' src="https://badge.fury.io/rb/search_architect.svg" alt="Gem Version"></a>
 <a href='https://github.com/westonganger/search_architect/actions' target='_blank'><img src="https://github.com/westonganger/search_architect/workflows/Tests/badge.svg" style="max-width:100%;" height='21' style='border:0px;height:21px;' border='0' alt="CI Status"></a>
-<a href='https://rubygems.org/gems/search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://ruby-gem-downloads-badge.herokuapp.com/search_architect?label=rubygems&type=total&total_label=downloads&color=brightgreen' border='0' alt='RubyGems Downloads' /></a>
+<a href='https://rubygems.org/gems/search_architect' target='_blank'><img height='21' style='border:0px;height:21px;' src='https://img.shields.io/gem/dt/search_architect?color=brightgreen&label=Rubygems%20Downloads' border='0' alt='RubyGems Downloads' /></a>
 
 Dead simple, powerful and fully customizable searching for your Rails or ActiveRecord models and associations. Capable of searching any attribute type using SQL type casting.
 
